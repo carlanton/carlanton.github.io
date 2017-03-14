@@ -1,0 +1,191 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="main.css">
+    <title>CoreOS Container Linux on ESXi with OVFTool</title>
+</head>
+<body>
+
+<h1>CoreOS Container Linux on ESXi with OVFTool</h1>
+<article>
+<p>
+  According to the Internet, there are a lot of different methods for
+  installing CoreOS Container Linux on ESXi. Unfortunately, most of them
+  requires some manual steps in ESXi's management interface: clicking around in
+  menus, mounting ISO files, browsing for floppies with cloud-config stuff, and
+  so on.  This is probably fine if you just want to try it out, but if you want
+  to provision many nodes this becomes pretty tedious.
+</p>
+
+<p>
+  <a href="https://www.vmware.com/support/developer/ovf/">OVFTool</a> is a
+  really neat tool that can automate all of this, including injection of
+  instance configuration! Download and install it and then get the latest
+  stable version of CoreOS:
+</p>
+<pre>
+$ wget \
+    https://stable.release.core-os.net/amd64-usr/current/coreos_production_vmware_ova_image.vmdk.bz2 \
+    https://stable.release.core-os.net/amd64-usr/current/coreos_production_vmware_ova.ovf
+
+$ bunzip2 coreos_production_vmware_ova_image.vmdk.bz2
+</pre>
+<p>
+  To configure the instance, you should definitely use
+  <a href="https://coreos.com/ignition/docs/latest/">Ignition</a>.
+  This is the successor of Cloud-Config and it's better in every way, except
+  that is has no support for comments or multi-line strings.
+  Fortunately, there is another tool called
+  <a href="https://github.com/coreos/container-linux-config-transpiler">ct</a>
+  which can transform a more human friendly yaml-based language to Ignition.
+</p>
+<p>
+  To keep things simple, these examples will use vanilla Ignition. The
+  following configuration will set the hostname, ssh keys and a static address
+  for the instance:
+</p>
+<pre>
+$ cat &gt; coreos-0.json &lt;&lt; EOF
+{
+  "ignition": {
+    "version": "2.0.0"
+  },
+  "storage": {
+    "files": [
+      {
+        "filesystem": "root",
+        "path": "/etc/hostname",
+        "mode": 420,
+        "contents": {
+          "source": "data:,core-0"
+        }
+      }
+    ]
+  },
+  "passwd": {
+    "users": [
+      {
+        "name": "core",
+        "sshAuthorizedKeys": [
+          "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDGdByTgSVHq......."
+        ]
+      }
+    ]
+  },
+  "networkd": {
+    "units": [
+      {
+        "name": "00-ens192.network",
+        "contents": "[Match]\nName=ens192\n\n[Network]\nDNS=1.2.3.4\nAddress=10.0.0.101/24\nGateway=10.0.0.1"
+      }
+    ]
+  }
+}
+EOF
+</pre>
+
+<p>
+  There are some issues with the original OVF file and ESXi 6.5. The machine
+  will boot just fine, but you can get warnings that it's running another OS
+  than specified. You can also bump the virtual hardware version to
+  6.5 (<code>vmx-13</code>). Let's fix that:
+</p>
+
+<pre>
+$ sed \
+    -e 's/other26xLinux64Guest/other3xLinux64Guest/' \
+    -e 's/&lt;vssd:VirtualSystemType&gt;.*&lt;\/vssd:VirtualSystemType&gt;/&lt;vssd:VirtualSystemType&gt;vmx-13&lt;\/vssd:VirtualSystemType&gt;/' \
+    &lt; coreos_production_vmware_ova.ovf &gt; coreos_production_vmware_ova-esxi65.ovf
+</pre>
+
+<p>
+  Now we're ready to create a new CoreOS instance with OVFTool:
+</p>
+
+<pre>
+$ ovftool \
+    -ds=datastore1 \
+    --name=coreos-0 \
+    --net:"VM Network=VM Network" \
+    --X:guest:coreos.config.data="$(gzip &lt; coreos-0.json | base64)" \
+    --X:guest:coreos.config.data.encoding=gzip+base64 \
+    --powerOn --skipManifestCheck --noSSLVerify \
+    coreos_production_vmware_ova.ovf \
+    vi://username:password@your-esxi-host
+</pre>
+
+<p>
+  Your new virtual machine will soon be available on the specified address and
+  you should hopefully be able to login using <code>ssh -l core
+  <em>the-ip-address</em></code>.
+  If you need to make changes to the Ignition config, you can use the parameter
+  <code>--overwrite</code> to OVFTool to automatically destroy the old instance
+  before creating a new.
+</p>
+
+<h2>Other resources</h2>
+<ul>
+  <li>
+    <a href="https://www.vmware.com/support/developer/ovf/ovf420/ovftool-420-userguide.pdf">OVF Tool user's guide</a>
+  </li>
+  <li>
+    <a href="https://coreos.com/os/docs/latest/booting-on-vmware.html#booting-with-vmware-esxi">Running CoreOS Container Linux on VMware</a>
+  </li>
+  <li>
+    <a href="https://coreos.com/ignition/docs/latest/getting-started.html">Getting Started with Ignition</a>
+  </li>
+  <li>
+    <a href="https://coreos.com/ignition/docs/latest/configuration-v2_0.html">Ignition Configuration Specification</a>
+  </li>
+  <li>
+    <a href="https://github.com/coreos/container-linux-config-transpiler">Container Linux Config Transpiler</a>
+  </li>
+</ul>
+
+<h2>Complete example</h2>
+<pre>
+#!/bin/bash
+set -eou pipefail
+
+vm_name="core0"
+vm_net="VM Network"
+ignition_config="core-0.json"
+
+esxi_host="username:password@your-esxi-host"
+datastore="datastore1"
+coreos_ovf="coreos_production_vmware_ova.ovf"
+esxi65_ovf="coreos_production_vmware_ova-esxi65.ovf"
+
+
+wget \
+    https://stable.release.core-os.net/amd64-usr/current/coreos_production_vmware_ova_image.vmdk.bz2 \
+    https://stable.release.core-os.net/amd64-usr/current/coreos_production_vmware_ova.ovf
+
+bunzip2 coreos_production_vmware_ova_image.vmdk.bz2
+
+# Patch ovf file to improve compatibility with ESXi 6.5
+sed \
+  -e 's/other26xLinux64Guest/other3xLinux64Guest/' \
+  -e 's/&lt;vssd:VirtualSystemType&gt;.*&lt;\/vssd:VirtualSystemType&gt;/&lt;vssd:VirtualSystemType&gt;vmx-13&lt;\/vssd:VirtualSystemType&gt;/' \
+  &lt; "$coreos_ovf" &gt; "$esxi65_ovf"
+
+ignition_config_data=$(gzip &lt; "$ignition_config" | base64)
+
+ovftool \
+  ${ovf_params} \
+  -ds="$datastore" \
+  --name="$vm_name" \
+  --net:"VM Network=$vm_net" \
+  --X:guest:"coreos.config.data=$ignition_config_data" \
+  --X:guest:"coreos.config.data.encoding=gzip+base64" \
+  --powerOn --skipManifestCheck --X:noPrompting --noSSLVerify \
+  $esxi65_ovf \
+  vi://$esxi_host
+
+</pre>
+</article>
+<footer>2017-03-14 - Anton Lindström</footer>
+
+</body>
+</html>

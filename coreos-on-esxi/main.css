@@ -1,0 +1,25 @@
+body {
+    font-family: serif;
+    font-weight: 300;
+    font-size: 14pt;
+    color: #ddd;
+    background-color: #222;
+    padding: 10px;
+}
+
+h1, h2 {
+    color: white;
+    font-family: "HelveticaNeue-Light", "Helvetica Neue Light", "Helvetica Neue", Helvetica, Arial, "Lucida Grande", sans-serif; 
+}
+
+a {
+    color: #fff;
+}
+
+pre {
+    font-family: monospace;
+    font-size: 12pt;
+    color: #fff;
+    border: 2px solid gray;
+    padding: 10px;
+}
