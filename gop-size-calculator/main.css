@@ -1,0 +1,34 @@
+body {
+    font-family: serif;
+    font-weight: 300;
+    font-size: 14pt;
+    padding: 10px;
+}
+h1, h2 {
+    color: #333;
+    font-family: "HelveticaNeue-Light", "Helvetica Neue Light", "Helvetica Neue", Helvetica, Arial, "Lucida Grande", sans-serif; 
+}
+
+fieldset {
+  border: 1px solid #222;
+}
+
+div {
+  padding: 5px;
+}
+
+table {
+  margin-left: auto;
+  margin-right: auto;
+
+  text-align: right;
+  font-family: monospace;
+  font-size: 14pt;
+  border: 1px solid #222;
+  border-spacing: 5px;
+  border-collapse: separate;
+}
+
+footer {
+  margin-top: 20px;
+}

@@ -1,0 +1,81 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="main.css">
+    <title>GOP size calculator</title>
+    <script src="gop.js"></script>
+</head>
+<body>
+
+<h1>GOP size calculator</h1>
+<article>
+  <p>
+   This is a tool for calculating Group Of Pictures lengths which allows
+   alignment with AAC frames. Audio &amp; video alignment can be useful in
+   segmented streaming protocols such as MPEG-DASH and HLS since it allows all
+   segments to be of the same length.
+  </p>
+
+  <fieldset>
+
+    <div>
+      <label>
+        Video frame rate:
+        <input type="number" name="frameRate" value="25" required min="0" max="200"/> fps
+      </label>
+    </div>
+
+    <div>
+    <label>
+      Audio sample rate
+      <select name="sampleRate">
+        <option value="8000">8000</option>
+        <option value="12000">12000</option>
+        <option value="16000">16000</option>
+        <option value="22050">22050</option>
+        <option value="24000">24000</option>
+        <option value="32000">32000</option>
+        <option value="44100">44100</option>
+        <option value="48000" selected>48000</option>
+        <option value="88200">88200</option>
+        <option value="96000">96000</option>
+      </select>
+      Hz
+    </label>
+    </div>
+
+    <div>
+    <label>
+      Audio samples per frame
+      <select name="samplesPerFrame">
+        <option value="960">960</option>
+        <option value="1024" selected>1024</option>
+      </select>
+    </label>
+    </div>
+  </fieldset>
+
+  <br />
+
+  <table>
+    <thead>
+      <tr>
+        <th>
+          Frames
+        </th>
+        <th>
+          Seconds
+        </th>
+      </tr>
+    </thead>
+    <tbody id="tbody">
+    </tbody>
+  </table>
+
+</article>
+
+<footer>2018-03-06 - Anton Lindström</footer>
+
+</body>
+</html>
