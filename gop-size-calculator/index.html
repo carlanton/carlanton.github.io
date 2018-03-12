@@ -8,17 +8,34 @@
 </head>
 <body>
 
-<h1>GOP size calculator</h1>
+<h1>GOP size calculator for segment alignment</h1>
 <article>
   <p>
-   This is a tool for calculating Group Of Pictures lengths which allows
-   alignment with AAC frames. Audio &amp; video alignment can be useful in
-   segmented streaming protocols such as MPEG-DASH and HLS since it allows all
-   segments to be of the same length.
+    This is a tool for calculating Group Of Pictures size that allows segment
+    alignment between video and AAC-encoded audio. Segment alignment can be
+    useful in segmented streaming protocols such as MPEG-DASH and HLS since it
+    allows all segments to be of the same length. MPEG-DASH manifests with
+    segment timelines will also be more compact.
+  </p>
+
+  <p>
+    Segment alignment is achieved if the duration of all video frames in a
+    segment is equal to the duration of all audio frames. This can be a bit
+    tricky since the AAC audio frames per packet size is fixed to 1024.
+    (It's also possible to use 960 frames per packet, but that doesn't seem
+    too common.) Video streams are usually segmented on whole GOPs, so the
+    length of all video frames in a segment depends on the GOP size and the
+    frame rate.
+  </p>
+
+  <p>
+    Using Math&trade;, this tool will calculate the minimal GOP size that gives segment
+    alignment and then simply multiplies this number with an integer to give you
+    more options. <em>Example:</em> you want a GOP size of ~2 seconds @ 25fps with 48kHz
+    audio &rarr; select 1.92 or 2.24 seconds.
   </p>
 
   <fieldset>
-
     <div>
       <label>
         Video frame rate:
@@ -47,8 +64,8 @@
 
     <div>
     <label>
-      Audio samples per frame
-      <select name="samplesPerFrame">
+      Audio frames per packet
+      <select name="framesPerPacket">
         <option value="960">960</option>
         <option value="1024" selected>1024</option>
       </select>
@@ -72,10 +89,9 @@
     <tbody id="tbody">
     </tbody>
   </table>
-
 </article>
 
-<footer>2018-03-06 - Anton Lindström</footer>
+<footer>2018-03-12 - Anton Lindström</footer>
 
 </body>
 </html>
