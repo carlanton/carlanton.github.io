@@ -1,0 +1,126 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="main.css">
+    <title>Dynamic VLAN using RADIUS MAC Authentication</title>
+    <link rel="stylesheet" href="highlightjs/railscasts.min.css">
+    <script src="highlightjs/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+</head>
+<body>
+
+<h1>Dynamic VLAN using RADIUS MAC Authentication</h1>
+<em>Keywords: Ubiquiti, UniFi, EdgeOS, RADIUS, Dynamic VLAN assignment</em>
+<article>
+<p>
+  I wanted to segment the clients on my wireless network. The correct way to do
+  this is to use WPA2-Enterprise with 802.1X, but this will not work on all
+  home devices such as my SmartTV. A workaround for this is to use multiple
+  SSIDs with one VLAN per network and then connect each device to the
+  corresponding network.  Another, much cooler way is to use RADIUS MAC
+  authentication. This is supported on the UniFi platform but I haven't found
+  any good instruction for how to set it up so here we go:
+</p>
+
+<p>
+  When RADIUS MAC authentication is enabled, your access point will reach out
+  to a RADIUS server and check if the device is allowed to connect and which
+  VLAN it should use. The AP will use the connecting device's MAC-address as
+  username and password for the request. It's very easy to spoof MAC-addresses
+  so this type of authentication is pretty weak. Hopefully, my SmartTV will not
+  be able to figure this out.
+</p>
+
+<p>
+  There are some prerequisites if you want all this to work:
+  <ul>
+    <li>The access point must be connected to all VLANs that will be used.</li>
+    <li>The access point's management interface cannot be one of the dynamically assigned VLANs.</li>
+  </ul>
+  For example, in my setup I've put the access points on VLAN 5, my TV on VLAN
+  20 and all other clients on VLAN 10.
+</p>
+
+<h2>radius-mac</h2>
+<p>
+  The first thing you need is a RADIUS server. You can use FreeRADIUS but I
+  felt it was too complicated. I also wanted a default VLAN for all
+  other devices which was tricky to do. To solve this I've made a tiny RADIUS
+  server that only support MAC authentication:
+  <a href="https://github.com/carlanton/radius-mac/"><code>radius-mac</code></a>.
+  The software must run on a server that can be accessed by your access point,
+  preferably on the same LAN. I run it on my EdgeRouter X, but anything should
+  work.
+</p>
+
+<p>
+  <code>radius-mac</code> always accepts clients. If the client is not defined in the configuration, it will
+  use the "default VLAN" instead. The configuration looks like this:
+</p> 
+<pre><code class="toml">[server]
+address = 192.168.5.1
+port = 1812
+secret = shared-secret-xyz
+
+; Clients that are not defined below will be assigned to a default VLAN:
+default_vlan = 10
+
+;
+; Clients:
+;
+
+[10:11:12:13:14]
+description = SmartTV
+vlan = 22
+
+[10:11:12:13:44]
+description = Chromecast
+vlan = 23
+
+[20:81:12:13:44]
+description = Toaster
+vlan = 24
+</code></pre>
+<p>
+  Then start the server: <code>radius-mac -c ./radius-mac.ini</code>
+</p>
+<p>
+  If you want you can now test the server configuration using <code>radclient</code>:
+
+<pre><code class="bash">$ (mac="20:81:12:13:44"; echo "User-Name=$mac, User-Password=$mac") | \
+    radclient -x 192.168.5.1:1812 auth shared-secret-xyz
+
+Sent Access-Request Id 239 from 192.168.5.2:35124 to 192.168.5.1:1812 length 54
+    User-Name = "20:81:12:13:44"
+    User-Password = "20:81:12:13:44"
+    Cleartext-Password = "20:81:12:13:44"
+Received Access-Accept Id 239 from 192.168.5.1:1812 to 192.168.5.2:35124 length 37
+    Tunnel-Type:0 = VLAN
+    Tunnel-Medium-Type:0 = IEEE-802
+    Tunnel-Private-Group-Id:0 = "24" # this is the vlan-id!
+</code></pre>
+</p>
+
+<h2>UniFi configuration</h2>
+<p>
+The next step is to create a RADIUS profile for your <code>radius-mac</code> instance. This
+  is done in the UniFi controller under <code>Settings / Profiles / Create New Radius Profile</code>.
+  Use the same IP address, port and shared secret as in the <code>radius-mac</code> configuration file.
+</p>
+<img src="radius-profile.png" />
+
+
+<p>
+  You also need to activate RADIUS MAC authentication for the wireless network.
+  It's probably good to create a new wireless network when testing to avoid
+  locking yourself out :)
+</p>
+
+<img src="wireless-rma.png" />
+
+</article>
+<footer>2020-08-30 - Anton Lindström</footer>
+
+</body>
+</html>
